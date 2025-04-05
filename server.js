@@ -4,6 +4,7 @@ File: Server.js
 Description: Web API scaffolding for Movie API
  */
 
+require('dotenv').config();
 var express = require('express');
 var bodyParser = require('body-parser');
 var passport = require('passport');
@@ -14,6 +15,7 @@ var cors = require('cors');
 var User = require('./Users');
 var Movie = require('./Movies');
 var Review = require('./Reviews');
+
 
 var app = express();
 app.use(cors());
@@ -87,8 +89,84 @@ router.post('/signin', function (req, res) {
     })
 });
 
+
+// Import movie routes
+const movieRoutes = require('./Movies');
+
+// Use routes
 app.use('/', router);
-app.listen(process.env.PORT || 8080);
+app.use('/movies', movieRoutes);
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+
+
+// POST /reviews - Create a new review (secured with JWT)
+router.post('/reviews', authJwtController.isAuthenticated, function(req, res) {
+    var reviewData = req.body;
+    // Check that the required fields are provided
+    if (!reviewData.movieId || !reviewData.review || typeof reviewData.rating === 'undefined') {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
+    
+    // Set the username from the JWT token (req.user is set by auth_jwt)
+    reviewData.username = req.user.username;
+    
+    var newReview = new Review(reviewData);
+    newReview.save(function(err) {
+      if (err) return res.status(500).json({ message: err.message });
+      // (Extra Credit) Optionally, add custom analytics tracking here
+      res.status(201).json({ message: 'Review created!' });
+    });
+  });
+
+// GET /reviews - Get all reviews (secured with JWT)
+router.get('/reviews', authJwtController.isAuthenticated, function(req, res) {
+    Review.find({}, function(err, reviews) {
+        if (err) return res.status(500).json({ message: err.message });
+        res.json(reviews);
+    });
+});
+
+// GET /movies/:id - Retrieve a movie; if query parameter reviews=true, include its reviews
+router.get('/movies/:id', function(req, res) {
+    var movieId = req.params.id;
+    if (req.query.reviews === 'true') {
+      const mongoose = require('mongoose');
+      Movie.aggregate([
+        { $match: { _id: mongoose.Types.ObjectId(movieId) } },
+        {
+          $lookup: {
+            from: 'reviews',         // MongoDB collection name for reviews
+            localField: '_id',
+            foreignField: 'movieId',
+            as: 'reviews'
+          }
+        }
+      ], function(err, result) {
+        if (err) return res.status(500).json({ message: err.message });
+        if (!result || result.length === 0) {
+          return res.status(404).json({ message: 'Movie not found.' });
+        }
+        res.json(result[0]);
+      });
+    } else {
+      // Standard lookup without reviews
+      Movie.findById(movieId, function(err, movie) {
+        if (err) return res.status(500).json({ message: err.message });
+        if (!movie) return res.status(404).json({ message: 'Movie not found.' });
+        res.json(movie);
+      });
+    }
+  });
+  
+
+
+app.use('/', router);
+app.listen(process.env.PORT || 3000);
 module.exports = app; // for testing only
 
 
