@@ -306,6 +306,7 @@ router.delete('/:title', authJwtController.isAuthenticated, async (req, res) => 
 
 // Use routes
 app.use('/', router);
+app.use('/movies', router);
 app.listen(process.env.PORT || 8080);
 module.exports = app; // for testing only
 
