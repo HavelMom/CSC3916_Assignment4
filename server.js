@@ -109,7 +109,7 @@ router.post('/reviews', authJwtController.isAuthenticated, function(req, res) {
     newReview.save(function(err) {
       if (err) return res.status(500).json({ message: err.message });
       // (Extra Credit) Optionally, add custom analytics tracking here
-      res.status(201).json({ message: 'Review created!' });
+      res.status(200).json({ message: 'Review created!' });
     });
   });
 
@@ -154,29 +154,24 @@ router.get('/movies/:id', function(req, res) {
   });
   
 // GET all movies, with optional ?reviews=true
-router.get('/', authJwtController.isAuthenticated, async (req, res) => {
+router.get(['/', '/movies'], authJwtController.isAuthenticated, async (req, res) => {
   try {
-    // if the client asked for reviews, do one big $lookup
     if (req.query.reviews === 'true') {
       const moviesWithReviews = await Movie.aggregate([
         {
           $lookup: {
-            from:         'reviews',      // the actual MongoDB collection name
-            localField:   '_id',          // Movie._id
-            foreignField: 'movieId',      // Review.movieId
+            from:         'reviews',
+            localField:   '_id',
+            foreignField: 'movieId',
             as:           'reviews'
           }
         }
       ]);
       return res.status(200).json(moviesWithReviews);
     }
-
-    // otherwise just return the basic Movie docs
     const movies = await Movie.find();
     res.status(200).json(movies);
-
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -197,7 +192,7 @@ router.get('/:title', authJwtController.isAuthenticated, async (req, res) => {
 });
 
 // POST new movie
-router.post('/', authJwtController.isAuthenticated, async (req, res) => {
+router.post(['/', '/movies'], authJwtController.isAuthenticated, async (req, res) => {
   try {
     // Validate required fields
     if (!req.body.title || !req.body.releaseDate || !req.body.genre) {
@@ -232,7 +227,7 @@ router.post('/', authJwtController.isAuthenticated, async (req, res) => {
 
     // Save movie to database
     const movie = await newMovie.save();
-    res.status(201).json({ success: true, message: 'Movie created!', movie: movie });
+    res.status(200).json({ success: true, message: 'Movie created!', movie });
   } catch (err) {
     if (err.name === 'ValidationError') {
       return res.status(400).json({ success: false, message: err.message });
