@@ -15,6 +15,7 @@ var cors = require('cors');
 var User = require('./Users');
 var Movie = require('./Movies');
 var Review = require('./Reviews');
+var mongoose = require('mongoose');
 
 
 var app = express();
@@ -152,13 +153,31 @@ router.get('/movies/:id', function(req, res) {
     }
   });
   
-// GET all movies
+// GET all movies, with optional ?reviews=true
 router.get('/', authJwtController.isAuthenticated, async (req, res) => {
   try {
+    // if the client asked for reviews, do one big $lookup
+    if (req.query.reviews === 'true') {
+      const moviesWithReviews = await Movie.aggregate([
+        {
+          $lookup: {
+            from:         'reviews',      // the actual MongoDB collection name
+            localField:   '_id',          // Movie._id
+            foreignField: 'movieId',      // Review.movieId
+            as:           'reviews'
+          }
+        }
+      ]);
+      return res.status(200).json(moviesWithReviews);
+    }
+
+    // otherwise just return the basic Movie docs
     const movies = await Movie.find();
     res.status(200).json(movies);
+
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error(err);
+    res.status(500).json({ message: err.message });
   }
 });
 
