@@ -129,6 +129,15 @@ router.post('/reviews', authJwtController.isAuthenticated, async (req, res) => {
   });
 });
 
+router.get('/reviews', authJwtController.isAuthenticated, async (req, res) => {
+  try {
+    const reviews = await Review.find();
+    return res.status(200).json(reviews);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
 // GET /movies/:id - Retrieve a movie; if query parameter reviews=true, include its reviews
 router.get('/movies/:id', function(req, res) {
     var movieId = req.params.id;
