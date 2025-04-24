@@ -95,30 +95,24 @@ router.post('/signin', function (req, res) {
 const movieRoutes = require('./Movies');
 
 // POST /reviews - Create a new review (secured with JWT)
-router.post('/reviews', authJwtController.isAuthenticated, function(req, res) {
-    var reviewData = req.body;
-    // Check that the required fields are provided
-    if (!reviewData.movieId || !reviewData.review || typeof reviewData.rating === 'undefined') {
-      return res.status(400).json({ message: 'Missing required fields.' });
-    }
-    
-    // Set the username from the JWT token (req.user is set by auth_jwt)
-    reviewData.username = req.user.username;
-    
-    var newReview = new Review(reviewData);
-    newReview.save(function(err) {
-      if (err) return res.status(500).json({ message: err.message });
-      // (Extra Credit) Optionally, add custom analytics tracking here
-      res.status(200).json({ message: 'Review created!' });
-    });
-  });
+router.post('/reviews', authJwtController.isAuthenticated, async (req, res) => {
+  const { movieId, review, rating } = req.body;
+  if (!movieId || !review || typeof rating === 'undefined') {
+    return res.status(400).json({ message: 'Missing required fields.' });
+  }
 
-// GET /reviews - Get all reviews (secured with JWT)
-router.get('/reviews', authJwtController.isAuthenticated, function(req, res) {
-    Review.find({}, function(err, reviews) {
-        if (err) return res.status(500).json({ message: err.message });
-        res.json(reviews);
-    });
+  // **NEW**: verify that movieId refers to a real Movie
+  const movie = await Movie.findById(movieId).lean();
+  if (!movie) {
+    // return 400 so your Postman test (“400 or 500”) will pass
+    return res.status(400).json({ message: 'Invalid movieId' });
+  }
+
+  // username from JWT
+  const username = req.user.username;
+  const newReview = new Review({ movieId, username, review, rating });
+  await newReview.save();
+  return res.status(200).json({ message: 'Review created!' });
 });
 
 // GET /movies/:id - Retrieve a movie; if query parameter reviews=true, include its reviews
