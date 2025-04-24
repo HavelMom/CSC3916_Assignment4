@@ -97,22 +97,36 @@ const movieRoutes = require('./Movies');
 // POST /reviews - Create a new review (secured with JWT)
 router.post('/reviews', authJwtController.isAuthenticated, async (req, res) => {
   const { movieId, review, rating } = req.body;
+
+  // 1) Required fields
   if (!movieId || !review || typeof rating === 'undefined') {
     return res.status(400).json({ message: 'Missing required fields.' });
   }
 
-  // **NEW**: verify that movieId refers to a real Movie
-  const movie = await Movie.findById(movieId).lean();
+  // 2) movieId must be a real Movie
+  let movie;
+  try {
+    movie = await Movie.findById(movieId);
+  } catch (err) {
+    // handles invalid ObjectId format
+    return res.status(400).json({ message: 'Invalid movieId' });
+  }
   if (!movie) {
-    // return 400 so your Postman test (“400 or 500”) will pass
     return res.status(400).json({ message: 'Invalid movieId' });
   }
 
-  // username from JWT
-  const username = req.user.username;
-  const newReview = new Review({ movieId, username, review, rating });
-  await newReview.save();
-  return res.status(200).json({ message: 'Review created!' });
+  // 3) All good—attach username & save
+  const newReview = new Review({
+    movieId,
+    username: req.user.username,
+    review,
+    rating
+  });
+
+  newReview.save(err => {
+    if (err) return res.status(500).json({ message: err.message });
+    return res.status(200).json({ message: 'Review created!' });
+  });
 });
 
 // GET /movies/:id - Retrieve a movie; if query parameter reviews=true, include its reviews
